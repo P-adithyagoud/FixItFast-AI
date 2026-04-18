@@ -6,12 +6,19 @@ from flask import Flask, render_template, request, jsonify
 from groq import Groq
 from dotenv import load_dotenv
 
-# Load environment variables (look in root directory)
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
-
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Load environment variables (look in root directory)
+# Set override=True to ensure .env values take precedence over shell defaults
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env'))
+logger.info(f"Checking for .env at: {env_path}")
+if os.path.exists(env_path):
+    load_dotenv(env_path, override=True)
+    logger.info("load_dotenv() called.")
+else:
+    logger.warning(f".env file not found at {env_path}")
 
 app = Flask(__name__, 
             template_folder='../templates', 
@@ -19,11 +26,26 @@ app = Flask(__name__,
 
 # Application Configuration
 class Config:
-    GROQ_API_KEY = os.getenv('GROQ_API_KEY')
-    MODEL_NAME = os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')
-    MAX_TOKENS = int(os.getenv('MAX_TOKENS', 1500))
-    TEMPERATURE = float(os.getenv('TEMPERATURE', 0.2))
+    @property
+    def GROQ_API_KEY(self):
+        return os.getenv('GROQ_API_KEY')
+    
+    @property
+    def MODEL_NAME(self):
+        return os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')
+        
+    @property
+    def MAX_TOKENS(self):
+        return int(os.getenv('MAX_TOKENS', 1500))
+        
+    @property
+    def TEMPERATURE(self):
+        return float(os.getenv('TEMPERATURE', 0.2))
+        
     INCIDENT_CHAR_LIMIT = 5000
+
+# Instantiate config
+config = Config()
 
 # Singleton client to optimize connection pooling
 _groq_client = None
@@ -34,7 +56,7 @@ def get_groq_client():
     if _groq_client is not None:
         return _groq_client
         
-    api_key = Config.GROQ_API_KEY
+    api_key = config.GROQ_API_KEY
     if not api_key:
         logger.error("GROQ_API_KEY is not set in environment variables.")
         return None
@@ -77,10 +99,13 @@ CRITICAL:
 def index():
     """Serve the root application page."""
     # Debug log for Vercel startup verification
-    if not Config.GROQ_API_KEY:
-        logger.warning("Application started without GROQ_API_KEY configured.")
+    # Debug log for Vercel startup verification
+    api_key = config.GROQ_API_KEY
+    if not api_key:
+        logger.warning("Application started WITHOUT GROQ_API_KEY configured.")
     else:
-        logger.info("Application started with GROQ_API_KEY detected.")
+        # Log first 4 chars of key for verification (safe)
+        logger.info(f"Application started with GROQ_API_KEY: {api_key[:4]}...")
         
     return render_template('index.html')
 
@@ -98,7 +123,7 @@ def analyze():
     if not incident:
         return jsonify({'error': 'Incident description cannot be empty'}), 400
     
-    if len(incident) > Config.INCIDENT_CHAR_LIMIT:
+    if len(incident) > config.INCIDENT_CHAR_LIMIT:
         return jsonify({'error': f'Incident description too long (max {Config.INCIDENT_CHAR_LIMIT} characters)'}), 400
     
     # Get client lazily
@@ -112,13 +137,13 @@ def analyze():
         user_prompt = f"Incident Details:\n{incident}"
         
         response = client.chat.completions.create(
-            model=Config.MODEL_NAME,
+            model=config.MODEL_NAME,
             messages=[
                 {'role': 'system', 'content': SYSTEM_PROMPT},
                 {'role': 'user', 'content': user_prompt}
             ],
-            max_tokens=Config.MAX_TOKENS,
-            temperature=Config.TEMPERATURE,
+            max_tokens=config.MAX_TOKENS,
+            temperature=config.TEMPERATURE,
             response_format={"type": "json_object"}
         )
         
