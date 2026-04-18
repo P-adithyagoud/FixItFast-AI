@@ -48,7 +48,7 @@ echo "OPENAI_API_KEY=your_api_key_here" > .env
 ### 3. Run
 
 ```bash
-python app.py
+python api/index.py
 ```
 
 The app will be available at: **http://localhost:5000**

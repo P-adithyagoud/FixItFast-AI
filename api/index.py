@@ -13,8 +13,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, 
-            template_folder='templates', 
-            static_folder='static')
+            template_folder='../templates', 
+            static_folder='../static')
 
 # Application Configuration
 class Config:

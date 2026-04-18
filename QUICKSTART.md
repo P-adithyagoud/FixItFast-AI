@@ -10,7 +10,7 @@ pip install -r requirements.txt
 echo "OPENAI_API_KEY=sk-..." > .env
 
 # 3. Run the app
-python app.py
+python api/index.py
 
 # 4. Open browser
 # → http://localhost:5000
