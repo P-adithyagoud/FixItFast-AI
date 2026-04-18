@@ -5,8 +5,8 @@ import re
 import logging
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables (look in root directory)
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
