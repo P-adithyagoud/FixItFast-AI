@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Incident Response Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Incident Response Assistant</h1>
+            <p class="subtitle">Resolve production issues in seconds</p>
+        </div>
+
+        <div class="input-section">
+            <textarea id="incidentInput" placeholder="Paste your incident (logs, error message, or description)..." spellcheck="false"></textarea>
+            <button id="analyzeBtn" class="btn-primary">Analyze Incident</button>
+            <div id="charCount" class="char-count">0 / 5000</div>
+        </div>
+
+        <div id="results" class="results-section" style="display: none;">
+            <div class="results-grid">
+                <div class="result-card">
+                    <h3>Root Cause</h3>
+                    <div id="rootCause" class="card-content"></div>
+                </div>
+
+                <div class="result-card">
+                    <h3>Immediate Fix</h3>
+                    <div id="immediateFix" class="card-content"></div>
+                </div>
+
+                <div class="result-card">
+                    <h3>Prevention</h3>
+                    <div id="prevention" class="card-content"></div>
+                </div>
+
+                <div class="result-card">
+                    <h3>Similar Past Incident</h3>
+                    <div id="similarIncident" class="card-content"></div>
+                </div>
+
+                <div class="result-card result-card-small">
+                    <h3>Similarity Score</h3>
+                    <div id="similarityScore" class="card-content"></div>
+                </div>
+
+                <div class="result-card result-card-small">
+                    <h3>Confidence Level</h3>
+                    <div id="confidenceLevel" class="card-content"></div>
+                </div>
+            </div>
+
+            <button id="resetBtn" class="btn-secondary">Analyze Another</button>
+        </div>
+
+        <div id="error" class="error-message" style="display: none;"></div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Analyzing incident...</p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
