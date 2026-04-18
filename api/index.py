@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, jsonify
-from groq import Groq
 import os
 import re
 import logging
+import json
+from flask import Flask, render_template, request, jsonify
+from groq import Groq
 from dotenv import load_dotenv
 
 # Load environment variables (look in root directory)
@@ -19,90 +20,57 @@ app = Flask(__name__,
 # Application Configuration
 class Config:
     GROQ_API_KEY = os.getenv('GROQ_API_KEY')
-    MODEL_NAME = 'llama-3.3-70b-versatile'
-    MAX_TOKENS = 1500
-    TEMPERATURE = 0.2
+    MODEL_NAME = os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')
+    MAX_TOKENS = int(os.getenv('MAX_TOKENS', 1500))
+    TEMPERATURE = float(os.getenv('TEMPERATURE', 0.2))
     INCIDENT_CHAR_LIMIT = 5000
 
+# Singleton client to optimize connection pooling
+_groq_client = None
+
 def get_groq_client():
-    """Lazy initialization of the Groq client to prevent startup crashes."""
+    """Persistent initialization of the Groq client."""
+    global _groq_client
+    if _groq_client is not None:
+        return _groq_client
+        
     api_key = Config.GROQ_API_KEY
     if not api_key:
         logger.error("GROQ_API_KEY is not set in environment variables.")
         return None
     
     try:
-        return Groq(
+        _groq_client = Groq(
             api_key=api_key,
             timeout=60.0,
             max_retries=3
         )
+        return _groq_client
     except Exception as e:
         logger.error(f"Failed to initialize Groq client: {str(e)}")
         return None
 
-SYSTEM_PROMPT = """You are a senior DevOps incident response engineer with deep production experience in high-scale systems.
+SYSTEM_PROMPT = """You are a senior DevOps incident response engineer with deep production experience.
 
-Analyze the following production incident and provide a precise, high-signal response.
+Analyze the incident and respond ONLY with a JSON object.
 
-Respond STRICTLY in this format:
+The JSON MUST follow this schema:
+{
+  "root_cause": "Detailed explanation of the root cause.",
+  "immediate_fix": "Step-by-step numbered list of fixes.",
+  "prevention": "Concrete engineering improvements.",
+  "similar_incident": "Realistic past incident context.",
+  "similarity_score": "0-100% with justification.",
+  "confidence_level": "High/Medium/Low with reason."
+}
 
-1. Likely Root Cause:
-- Specific explanation grounded in the incident
-
-2. Immediate Fix (Step-by-step):
-1. Step one
-2. Step two
-(Only actionable, no vague advice)
-
-3. Prevention:
-- Concrete engineering improvements
-
-4. Similar Past Incident:
-- Describe a realistic past incident and how it was resolved
-
-5. Similarity Score:
-- Rate how similar this issue is to the past incident (0–100%)
-- One-line justification
-
-6. Confidence Level:
-- High / Medium / Low
-- Brief reason
-
-IMPORTANT:
-- Avoid generic advice like 'check logs' or 'restart server' unless absolutely necessary
-- Be specific to the given incident
-- Prioritize signal over verbosity
-- Think like an on-call engineer under pressure
-- Responses should feel decisive, not uncertain"""
+CRITICAL:
+- No conversational text before or after the JSON.
+- No markdown formatting (like ```json).
+- Be specific, actionable, and decisive."""
 
 
-def parse_llm_response(response_text):
-    """Parse the LLM response into structured sections."""
-    sections = {
-        'root_cause': '',
-        'immediate_fix': '',
-        'prevention': '',
-        'similar_incident': '',
-        'similarity_score': '',
-        'confidence_level': ''
-    }
-    
-    patterns = {
-        'root_cause': r'1\.\s*Likely Root Cause:(.*?)(?=2\.|$)',
-        'immediate_fix': r'2\.\s*Immediate Fix.*?:(.*?)(?=3\.|$)',
-        'prevention': r'3\.\s*Prevention:(.*?)(?=4\.|$)',
-        'similar_incident': r'4\.\s*Similar Past Incident:(.*?)(?=5\.|$)',
-        'similarity_score': r'5\.\s*Similarity Score:(.*?)(?=6\.|$)',
-        'confidence_level': r'6\.\s*Confidence Level:(.*?)(?=$)'
-    }
-    
-    for key, pattern in patterns.items():
-        match = re.search(pattern, response_text, re.DOTALL | re.IGNORECASE)
-        if match:
-            sections[key] = match.group(1).strip()
-    
-    return sections
+# Deprecated: parse_llm_response is no longer needed with JSON mode
 
 
 @app.route('/')
@@ -141,7 +109,7 @@ def analyze():
         }), 503
     
     try:
-        user_prompt = f"Incident:\n{incident}"
+        user_prompt = f"Incident Details:\n{incident}"
         
         response = client.chat.completions.create(
             model=Config.MODEL_NAME,
@@ -150,16 +118,21 @@ def analyze():
                 {'role': 'user', 'content': user_prompt}
             ],
             max_tokens=Config.MAX_TOKENS,
-            temperature=Config.TEMPERATURE
+            temperature=Config.TEMPERATURE,
+            response_format={"type": "json_object"}
         )
         
-        response_text = response.choices[0].message.content
-        parsed = parse_llm_response(response_text)
-        
+        raw_content = response.choices[0].message.content
+        try:
+            parsed_result = json.loads(raw_content)
+        except json.JSONDecodeError:
+            logger.error(f"Failed to decode LLM response as JSON: {raw_content}")
+            return jsonify({'error': 'The analysis engine returned a malformed response. Please try again.'}), 502
+
         return jsonify({
             'success': True,
-            'result': parsed,
-            'raw': response_text
+            'result': parsed_result,
+            'raw': raw_content
         })
     
     except Exception as e:

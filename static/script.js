@@ -106,6 +106,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function formatText(text) {
         if (!text) return '<p style="color: var(--text-secondary); font-style: italic;">No information available</p>';
 
+        // If 'text' is an array (common in JSON mode for list fields), join it
+        if (Array.isArray(text)) {
+            text = text.join('\n');
+        }
+
+        // Ensure we are working with a string
+        text = String(text);
+
         // Convert numbered lists to <ol>
         text = text.replace(/^\s*(\d+)\.\s+/gm, '<li>');
         
