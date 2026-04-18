@@ -2,10 +2,15 @@ from flask import Flask, render_template, request, jsonify
 from groq import Groq
 import os
 import re
+import logging
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Configure Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__, 
             template_folder='templates', 
@@ -19,12 +24,22 @@ class Config:
     TEMPERATURE = 0.2
     INCIDENT_CHAR_LIMIT = 5000
 
-# Initialize Groq client
-client = Groq(
-    api_key=Config.GROQ_API_KEY,
-    timeout=60.0,
-    max_retries=3
-)
+def get_groq_client():
+    """Lazy initialization of the Groq client to prevent startup crashes."""
+    api_key = Config.GROQ_API_KEY
+    if not api_key:
+        logger.error("GROQ_API_KEY is not set in environment variables.")
+        return None
+    
+    try:
+        return Groq(
+            api_key=api_key,
+            timeout=60.0,
+            max_retries=3
+        )
+    except Exception as e:
+        logger.error(f"Failed to initialize Groq client: {str(e)}")
+        return None
 
 SYSTEM_PROMPT = """You are a senior DevOps incident response engineer with deep production experience in high-scale systems.
 
@@ -93,6 +108,12 @@ def parse_llm_response(response_text):
 @app.route('/')
 def index():
     """Serve the root application page."""
+    # Debug log for Vercel startup verification
+    if not Config.GROQ_API_KEY:
+        logger.warning("Application started without GROQ_API_KEY configured.")
+    else:
+        logger.info("Application started with GROQ_API_KEY detected.")
+        
     return render_template('index.html')
 
 
@@ -111,6 +132,13 @@ def analyze():
     
     if len(incident) > Config.INCIDENT_CHAR_LIMIT:
         return jsonify({'error': f'Incident description too long (max {Config.INCIDENT_CHAR_LIMIT} characters)'}), 400
+    
+    # Get client lazily
+    client = get_groq_client()
+    if not client:
+        return jsonify({
+            'error': 'AI Analysis Engine is not configured. Please set the GROQ_API_KEY environment variable.'
+        }), 503
     
     try:
         user_prompt = f"Incident:\n{incident}"
@@ -139,15 +167,15 @@ def analyze():
         status_code = 500
         
         if "401" in error_msg or "invalid_api_key" in error_msg:
-            error_msg = "Invalid API Key. Please check your .env configuration."
+            error_msg = "Invalid API Key. Please check your system configuration."
             status_code = 401
         elif "timeout" in error_msg.lower():
             error_msg = "Upstream API timeout. Please try again with a more concise description."
             status_code = 504
             
+        logger.exception(f"Analysis error: {error_msg}")
         return jsonify({'error': f'Analysis engine error: {error_msg}'}), status_code
 
 
 if __name__ == '__main__':
-    # Using default port 5000 for local development
     app.run(debug=True, port=5000)
