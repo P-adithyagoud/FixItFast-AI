@@ -4,13 +4,24 @@ import os
 import re
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
+app = Flask(__name__, 
+            template_folder='templates', 
+            static_folder='static')
 
-# Initialize Groq client with a longer timeout and retries
+# Application Configuration
+class Config:
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+    MODEL_NAME = 'llama-3.3-70b-versatile'
+    MAX_TOKENS = 1500
+    TEMPERATURE = 0.2
+    INCIDENT_CHAR_LIMIT = 5000
+
+# Initialize Groq client
 client = Groq(
-    api_key=os.getenv('GROQ_API_KEY'),
+    api_key=Config.GROQ_API_KEY,
     timeout=60.0,
     max_retries=3
 )
@@ -81,13 +92,13 @@ def parse_llm_response(response_text):
 
 @app.route('/')
 def index():
-    """Serve the frontend."""
+    """Serve the root application page."""
     return render_template('index.html')
 
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    """Analyze incident using Groq API."""
+    """Endpoint for incident analysis via AI."""
     data = request.get_json()
     
     if not data or 'incident' not in data:
@@ -98,20 +109,20 @@ def analyze():
     if not incident:
         return jsonify({'error': 'Incident description cannot be empty'}), 400
     
-    if len(incident) > 5000:
-        return jsonify({'error': 'Incident description too long (max 5000 characters)'}), 400
+    if len(incident) > Config.INCIDENT_CHAR_LIMIT:
+        return jsonify({'error': f'Incident description too long (max {Config.INCIDENT_CHAR_LIMIT} characters)'}), 400
     
     try:
         user_prompt = f"Incident:\n{incident}"
         
         response = client.chat.completions.create(
-            model='llama-3.3-70b-versatile',
+            model=Config.MODEL_NAME,
             messages=[
                 {'role': 'system', 'content': SYSTEM_PROMPT},
                 {'role': 'user', 'content': user_prompt}
             ],
-            max_tokens=1500,
-            temperature=0.2
+            max_tokens=Config.MAX_TOKENS,
+            temperature=Config.TEMPERATURE
         )
         
         response_text = response.choices[0].message.content
@@ -128,16 +139,15 @@ def analyze():
         status_code = 500
         
         if "401" in error_msg or "invalid_api_key" in error_msg:
-            error_msg = "Invalid API Key. Please check your .env file."
+            error_msg = "Invalid API Key. Please check your .env configuration."
             status_code = 401
         elif "timeout" in error_msg.lower():
-            error_msg = "The request timed out. Please try again or provide a shorter incident description."
+            error_msg = "Upstream API timeout. Please try again with a more concise description."
             status_code = 504
             
-        return jsonify({'error': f'Failed to analyze incident: {error_msg}'}), status_code
+        return jsonify({'error': f'Analysis engine error: {error_msg}'}), status_code
 
 
 if __name__ == '__main__':
+    # Using default port 5000 for local development
     app.run(debug=True, port=5000)
-
-

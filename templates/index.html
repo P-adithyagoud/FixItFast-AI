@@ -1,68 +1,87 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Incident Response Assistant</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>AI Incident Response Assistant</h1>
-            <p class="subtitle">Resolve production issues in seconds</p>
-        </div>
+{% extends 'layouts/base.html' %}
 
-        <div class="input-section">
-            <textarea id="incidentInput" placeholder="Paste your incident (logs, error message, or description)..." spellcheck="false"></textarea>
-            <button id="analyzeBtn" class="btn-primary">Analyze Incident</button>
+{% block title %}Analyze | AI Incident Response Assistant{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="hero">
+        <h1 class="animate-fade-in">Rapid Incident Diagnosis</h1>
+        <p class="subtitle animate-fade-in-delayed">Paste logs or error messages below for an instant engineering assessment.</p>
+    </div>
+
+    <div class="glass-card input-section animate-slide-up">
+        <div class="input-header">
+            <label for="incidentInput">Terminal Output or Logs</label>
             <div id="charCount" class="char-count">0 / 5000</div>
         </div>
+        <textarea id="incidentInput" placeholder="Enter incident details here..." spellcheck="false" autofocus></textarea>
+        <button id="analyzeBtn" class="btn-primary-glow">
+            <span class="btn-text">Analyze Incident</span>
+            <div class="btn-loader"></div>
+        </button>
+    </div>
 
-        <div id="results" class="results-section" style="display: none;">
-            <div class="results-grid">
-                <div class="result-card">
+    <div id="loading" class="loading-state" style="display: none;">
+        <div class="pulse-ring"></div>
+        <p>Expert-level analysis in progress...</p>
+    </div>
+
+    <div id="results" class="results-section" style="display: none;">
+        <div class="results-grid">
+            <div class="glass-card result-card" data-category="root_cause">
+                <div class="card-header">
+                    <span class="icon">🔍</span>
                     <h3>Root Cause</h3>
-                    <div id="rootCause" class="card-content"></div>
                 </div>
-
-                <div class="result-card">
-                    <h3>Immediate Fix</h3>
-                    <div id="immediateFix" class="card-content"></div>
-                </div>
-
-                <div class="result-card">
-                    <h3>Prevention</h3>
-                    <div id="prevention" class="card-content"></div>
-                </div>
-
-                <div class="result-card">
-                    <h3>Similar Past Incident</h3>
-                    <div id="similarIncident" class="card-content"></div>
-                </div>
-
-                <div class="result-card result-card-small">
-                    <h3>Similarity Score</h3>
-                    <div id="similarityScore" class="card-content"></div>
-                </div>
-
-                <div class="result-card result-card-small">
-                    <h3>Confidence Level</h3>
-                    <div id="confidenceLevel" class="card-content"></div>
-                </div>
+                <div id="rootCause" class="card-body"></div>
             </div>
 
-            <button id="resetBtn" class="btn-secondary">Analyze Another</button>
+            <div class="glass-card result-card" data-category="fix">
+                <div class="card-header">
+                    <span class="icon">⚡</span>
+                    <h3>Immediate Fix</h3>
+                </div>
+                <div id="immediateFix" class="card-body"></div>
+            </div>
+
+            <div class="glass-card result-card" data-category="prevention">
+                <div class="card-header">
+                    <span class="icon">🛡️</span>
+                    <h3>Prevention</h3>
+                </div>
+                <div id="prevention" class="card-body"></div>
+            </div>
+
+            <div class="glass-card result-card" data-category="past">
+                <div class="card-header">
+                    <span class="icon">📜</span>
+                    <h3>Similar Past Incident</h3>
+                </div>
+                <div id="similarIncident" class="card-body"></div>
+            </div>
+
+            <div class="glass-card result-card compact" data-category="score">
+                <div class="card-header">
+                    <span class="icon">🎯</span>
+                    <h3>Similarity Score</h3>
+                </div>
+                <div id="similarityScore" class="card-body large-text"></div>
+            </div>
+
+            <div class="glass-card result-card compact" data-category="confidence">
+                <div class="card-header">
+                    <span class="icon">⚖️</span>
+                    <h3>Confidence Level</h3>
+                </div>
+                <div id="confidenceLevel" class="card-body large-text"></div>
+            </div>
         </div>
 
-        <div id="error" class="error-message" style="display: none;"></div>
-
-        <div id="loading" class="loading" style="display: none;">
-            <div class="spinner"></div>
-            <p>Analyzing incident...</p>
+        <div class="action-footer">
+            <button id="resetBtn" class="btn-secondary-flat">Start New Analysis</button>
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
-</body>
-</html>
+    <div id="error" class="error-toast" style="display: none;"></div>
+</div>
+{% endblock %}
